@@ -97,7 +97,7 @@ Resources:
             !Sub |
               - #!/bin/bash
                 # environment variables
-                echo "S3_BUCKET_NAME=${S3Bucket}" >> /etc/environment
+                echo "S3_BUCKET_NAME=${FactorioS3Bucket}" >> /etc/environment
                 # yum updates and installs
                 yum update -y
                 yum install git -y
@@ -135,5 +135,5 @@ Resources:
 
                 service crond start
 
-              - { S3Bucket: !Ref FactorioS3Bucket }
+              - { FactorioS3Bucket: !Ref FactorioS3Bucket }
 
