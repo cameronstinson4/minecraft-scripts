@@ -18,7 +18,7 @@ echo "Extracting archive..."
 tar -xf "$TAR_FILE" -C "$INSTALL_DIR" --strip-components=1
 
 echo "Removing archive..."
-rm "$TAR_FILE"
+rm -f "$TAR_FILE" 
 
 echo "Changing permissions..."
 chown -R factorio:factorio "$INSTALL_DIR"

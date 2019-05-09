@@ -1,0 +1,139 @@
+Parameters:
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+    Default: factorio-ssh
+
+  InstanceType:
+    Description: WebServer EC2 instance type
+    Type: String
+    Default: t3.micro
+    AllowedValues:
+    - t3.micro
+    - t3.medium
+    - c5.large
+    - z1d.large
+
+  LatestAmiId:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+
+Resources:
+
+  # S3 Buckets (where backups are saved)
+  FactorioS3Bucket:
+    Type: AWS::S3::Bucket
+
+  # Role for Factorio Services
+  FactorioIAMRole:
+    Type: AWS::IAM::Role
+    Properties: 
+      AssumeRolePolicyDocument: 
+      AssumeRolePolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - 
+            Effect: "Allow"
+            Principal: 
+              Service: 
+                - "ec2.amazonaws.com"
+            Action: 
+              - "sts:AssumeRole"
+      Policies: 
+        - 
+          PolicyName: "root"
+          PolicyDocument: 
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action: s3:*
+              Resource:
+              - !Join [ '', [ 'arn:aws:s3:::', !Ref FactorioS3Bucket ] ] 
+              - !Join [ '', [ 'arn:aws:s3:::', !Ref FactorioS3Bucket, '/*' ] ] 
+
+  # Why is this necessary
+  FactorioInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties: 
+      Roles:
+        - Ref: FactorioIAMRole
+
+  # EC2 Security group
+  FactorioEC2SecurityGroup:
+      Type: AWS::EC2::SecurityGroup
+      Properties:
+        GroupDescription: SSH, and factorio access
+        SecurityGroupIngress:
+          - IpProtocol: tcp
+            FromPort: '22'
+            ToPort: '22'
+            CidrIp: '0.0.0.0/0'
+          - IpProtocol: tcp
+            FromPort: '27015'
+            ToPort: '27015'
+            CidrIp: '0.0.0.0/0'
+          - IpProtocol: udp
+            FromPort: '34197'
+            ToPort: '34197'
+            CidrIp: '0.0.0.0/0'
+            
+  # Server instance 
+  FactorioEC2:
+      Type: AWS::EC2::Instance
+      Properties:
+        InstanceType:
+          Ref: InstanceType
+        SecurityGroups:
+          - Ref: FactorioEC2SecurityGroup
+        KeyName:
+          Ref: KeyName
+        ImageId: 
+          Ref: LatestAmiId
+        IamInstanceProfile:
+          Ref: FactorioInstanceProfile
+        UserData:
+          Fn::Base64: 
+            !Sub |
+              - #!/bin/bash
+                # environment variables
+                echo "S3_BUCKET_NAME=${S3Bucket}" >> /etc/environment
+                # yum updates and installs
+                yum update -y
+                yum install git -y
+                # clone git repo with all scripts
+                mkdir /factorio
+                cd /factorio
+                git clone https://github.com/cameronstinson4/factorio-scripts.git
+                chmod +x /factorio/factorio-scripts/*.sh
+                # download factorio
+                /factorio/upgrade-factorio.sh
+                # create map
+                sudo /factorio/bin/x64/factorio --create saves/1.zip
+                # create factorio user
+                sudo adduser --disabled-login --no-create-home --gecos factorio factorio
+                sudo chown -R factorio:factorio /factorio/
+
+                sudo echo "[Unit]
+                Description=Factorio Server
+
+                [Service]
+                User=factorio
+                Restart=always
+                Type=simple
+                ExecStart=/factorio/bin/x64/factorio --start-server-load-latest 
+
+                [Install]
+                WantedBy=default.target" >> /etc/systemd/system/factorio.service
+
+                sudo systemctl daemon-reload
+                sudo systemctl start factorio.service
+                # setup cron jobs
+                (crontab -l 2>/dev/null; echo "*/15 * * * * /factorio/factorio-scripts/backup.sh ") | crontab -
+                (crontab -l 2>/dev/null; echo "@reboot /factorio/factorio-scripts/upgrade-factorio.sh ") | crontab -
+                (crontab -l 2>/dev/null; echo "@reboot service crond start ") | crontab -
+
+                service crond start
+
+              - { S3Bucket: !Ref FactorioS3Bucket }
+
