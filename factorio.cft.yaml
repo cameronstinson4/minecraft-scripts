@@ -135,7 +135,7 @@ Resources:
                 /factorio/bin/x64/factorio --create saves/1.zip
                 
                 chown -R factorio:factorio /factorio/
-                sudo systemctl start factorio.service
+                systemctl start factorio.service
 
                 # setup cron jobs
                 (crontab -l 2>/dev/null; echo "*/15 * * * * sudo /factorio/factorio-scripts/backup.sh ") | crontab -
