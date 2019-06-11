@@ -126,7 +126,7 @@ Resources:
                 cd /factorio
                 git clone https://github.com/cameronstinson4/factorio-scripts.git
                 chmod +x /factorio/factorio-scripts/*.sh
-                
+
                 # download factorio
                 /factorio/factorio-scripts/install-factorio.sh
 
@@ -135,7 +135,7 @@ Resources:
                 /factorio/bin/x64/factorio --create saves/1.zip
                 
                 chown -R factorio:factorio /factorio/
-                sudo systemctl status factorio.service
+                sudo systemctl start factorio.service
 
                 # setup cron jobs
                 (crontab -l 2>/dev/null; echo "*/15 * * * * sudo /factorio/factorio-scripts/backup.sh ") | crontab -
