@@ -13,7 +13,7 @@ UPGRADE="$1"
 echo "Downloading archive from: $DIST_URL"
 wget "$DIST_URL" -O "$TAR_FILE"
 
-if [ UPGRADE == "upgrade"]
+if [ "$UPGRADE" == "upgrade" ]
 then
 
     echo "Stopping factorio service..."
@@ -29,7 +29,7 @@ rm -f "$TAR_FILE"
 echo "Changing permissions..."
 chown -R factorio:factorio "$INSTALL_DIR"
 
-if [ UPGRADE == "upgrade"]
+if [ "$UPGRADE" == "upgrade" ]
 then
     echo "Starting factorio service..."
     systemctl start factorio.service
