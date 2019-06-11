@@ -93,28 +93,25 @@ Resources:
         IamInstanceProfile:
           Ref: FactorioInstanceProfile
         UserData:
-          Fn::Base64: 
-            !Sub |
-              - #!/bin/bash
+          Fn::Base64:
+            Fn::Sub:
+              - |  
+                #!/bin/bash
                 # environment variables
                 echo "S3_BUCKET_NAME=${FactorioS3Bucket}" >> /etc/environment
+
                 # yum updates and installs
                 yum update -y
                 yum install git -y
+
                 # clone git repo with all scripts
                 mkdir /factorio
-                cd /factorio
-                git clone https://github.com/cameronstinson4/factorio-scripts.git
-                chmod +x /factorio/factorio-scripts/*.sh
-                # download factorio
-                /factorio/upgrade-factorio.sh
-                # create map
-                sudo /factorio/bin/x64/factorio --create saves/1.zip
-                # create factorio user
-                sudo adduser --disabled-login --no-create-home --gecos factorio factorio
-                sudo chown -R factorio:factorio /factorio/
 
-                sudo echo "[Unit]
+                # create factorio user
+                adduser --no-create-home factorio
+
+                echo "
+                [Unit]
                 Description=Factorio Server
 
                 [Service]
@@ -126,14 +123,27 @@ Resources:
                 [Install]
                 WantedBy=default.target" >> /etc/systemd/system/factorio.service
 
-                sudo systemctl daemon-reload
-                sudo systemctl start factorio.service
+                cd /factorio
+                git clone https://github.com/cameronstinson4/factorio-scripts.git
+                chmod +x /factorio/factorio-scripts/*.sh
+                
+                # download factorio
+                /factorio/factorio-scripts/install-factorio.sh
+
+                # create map
+                mkdir /factorio/saves
+                /factorio/bin/x64/factorio --create saves/1.zip
+                
+                chown -R factorio:factorio /factorio/
+                sudo systemctl status factorio.service
+
                 # setup cron jobs
-                (crontab -l 2>/dev/null; echo "*/15 * * * * /factorio/factorio-scripts/backup.sh ") | crontab -
-                (crontab -l 2>/dev/null; echo "@reboot /factorio/factorio-scripts/upgrade-factorio.sh ") | crontab -
-                (crontab -l 2>/dev/null; echo "@reboot service crond start ") | crontab -
+                (crontab -l 2>/dev/null; echo "*/15 * * * * sudo /factorio/factorio-scripts/backup.sh ") | crontab -
+                (crontab -l 2>/dev/null; echo "@reboot sudo /factorio/factorio-scripts/install-factorio.sh upgrade ") | crontab -
+                (crontab -l 2>/dev/null; echo "@reboot sudo service crond start ") | crontab -
 
                 service crond start
 
-              - { FactorioS3Bucket: !Ref FactorioS3Bucket }
-
+              - {
+                FactorioS3Bucket: !Ref FactorioS3Bucket
+                }
