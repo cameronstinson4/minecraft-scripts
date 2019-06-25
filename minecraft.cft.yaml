@@ -3,7 +3,7 @@ Parameters:
     Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
     Type: AWS::EC2::KeyPair::KeyName
     ConstraintDescription: must be the name of an existing EC2 KeyPair.
-    Default: factorio-ssh
+    Default: minecraft-ssh
 
   InstanceType:
     Description: WebServer EC2 instance type
@@ -22,11 +22,11 @@ Parameters:
 Resources:
 
   # S3 Buckets (where backups are saved)
-  FactorioS3Bucket:
+  minecraftS3Bucket:
     Type: AWS::S3::Bucket
 
-  # Role for Factorio Services
-  FactorioIAMRole:
+  # Role for minecraft Services
+  minecraftIAMRole:
     Type: AWS::IAM::Role
     Properties: 
       AssumeRolePolicyDocument: 
@@ -49,21 +49,21 @@ Resources:
             - Effect: Allow
               Action: s3:*
               Resource:
-              - !Join [ '', [ 'arn:aws:s3:::', !Ref FactorioS3Bucket ] ] 
-              - !Join [ '', [ 'arn:aws:s3:::', !Ref FactorioS3Bucket, '/*' ] ] 
+              - !Join [ '', [ 'arn:aws:s3:::', !Ref minecraftS3Bucket ] ] 
+              - !Join [ '', [ 'arn:aws:s3:::', !Ref minecraftS3Bucket, '/*' ] ] 
 
   # Why is this necessary
-  FactorioInstanceProfile:
+  minecraftInstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties: 
       Roles:
-        - Ref: FactorioIAMRole
+        - Ref: minecraftIAMRole
 
   # EC2 Security group
-  FactorioEC2SecurityGroup:
+  minecraftEC2SecurityGroup:
       Type: AWS::EC2::SecurityGroup
       Properties:
-        GroupDescription: SSH, and factorio access
+        GroupDescription: SSH, and minecraft access
         SecurityGroupIngress:
           - IpProtocol: tcp
             FromPort: '22'
@@ -79,71 +79,67 @@ Resources:
             CidrIp: '0.0.0.0/0'
             
   # Server instance 
-  FactorioEC2:
+  minecraftEC2:
       Type: AWS::EC2::Instance
       Properties:
         InstanceType:
           Ref: InstanceType
         SecurityGroups:
-          - Ref: FactorioEC2SecurityGroup
+          - Ref: minecraftEC2SecurityGroup
         KeyName:
           Ref: KeyName
         ImageId: 
           Ref: LatestAmiId
         IamInstanceProfile:
-          Ref: FactorioInstanceProfile
+          Ref: minecraftInstanceProfile
         UserData:
           Fn::Base64:
             Fn::Sub:
               - |  
                 #!/bin/bash
                 # environment variables
-                echo "S3_BUCKET_NAME=${FactorioS3Bucket}" >> /etc/environment
+                echo "S3_BUCKET_NAME=${minecraftS3Bucket}" >> /etc/environment
 
                 # yum updates and installs
                 yum update -y
                 yum install git -y
 
                 # clone git repo with all scripts
-                mkdir /factorio
+                mkdir /minecraft
 
-                # create factorio user
-                adduser --no-create-home factorio
+                # create minecraft user
+                adduser --no-create-home minecraft
 
                 echo "
                 [Unit]
-                Description=Factorio Server
+                Description=minecraft Server
 
                 [Service]
-                User=factorio
+                User=minecraft
                 Restart=always
                 Type=simple
-                ExecStart=/factorio/bin/x64/factorio --start-server-load-latest 
+                ExecStart=java -Xmx1024M -Xms1024M -jar /minecraft/minecraft_server.1.14.3.jar nogui
 
                 [Install]
-                WantedBy=default.target" >> /etc/systemd/system/factorio.service
+                WantedBy=default.target" >> /etc/systemd/system/minecraft.service
 
-                cd /factorio
-                git clone https://github.com/cameronstinson4/factorio-scripts.git
-                chmod +x /factorio/factorio-scripts/*.sh
+                cd /minecraft
+                git clone https://github.com/cameronstinson4/minecraft-scripts.git
+                chmod +x /minecraft/minecraft-scripts/*.sh
 
-                # download factorio
-                /factorio/factorio-scripts/install-factorio.sh
+                # download minecraft
+                /minecraft/minecraft-scripts/install-minecraft.sh
 
-                # create map
-                mkdir /factorio/saves
-                /factorio/bin/x64/factorio --create saves/1.zip
-                
-                chown -R factorio:factorio /factorio/
-                systemctl start factorio.service
+                chown -R minecraft:minecraft /minecraft/
+                systemctl start minecraft.service
 
                 # setup cron jobs
-                (crontab -l 2>/dev/null; echo "*/15 * * * * sudo /factorio/factorio-scripts/backup.sh ") | crontab -
-                (crontab -l 2>/dev/null; echo "@reboot sudo /factorio/factorio-scripts/install-factorio.sh upgrade ") | crontab -
+                (crontab -l 2>/dev/null; echo "*/15 * * * * sudo /minecraft/minecraft-scripts/backup.sh ") | crontab -
+                (crontab -l 2>/dev/null; echo "@reboot sudo /minecraft/minecraft-scripts/install-minecraft.sh upgrade ") | crontab -
                 (crontab -l 2>/dev/null; echo "@reboot sudo service crond start ") | crontab -
 
                 service crond start
 
               - {
-                FactorioS3Bucket: !Ref FactorioS3Bucket
+                minecraftS3Bucket: !Ref minecraftS3Bucket
                 }
