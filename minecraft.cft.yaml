@@ -103,7 +103,7 @@ Resources:
                 # yum updates and installs
                 yum update -y
                 yum install git -y
-                yum install java-1.8.0-openjdk-devel
+                yum install java-1.8.0-openjdk-devel -y
 
                 # clone git repo with all scripts
                 mkdir /minecraft
@@ -114,12 +114,22 @@ Resources:
                 echo "
                 [Unit]
                 Description=minecraft Server
+                After=network.target
 
                 [Service]
+                WorkingDirectory=/minecraft/
                 User=minecraft
+                Group=minecraft
                 Restart=always
+                RestartSec=60s
                 Type=simple
-                ExecStart=java -Xmx1024M -Xms1024M -jar /minecraft/server.jar nogui
+
+                ExecStart=/usr/bin/java -Xmx1024M -Xms1024M -jar /minecraft/server.jar nogui
+
+                ExecStop=/usr/bin/screen -p 0 -S mc-%i -X eval 'stuff "say SERVER SHUTTING DOWN. Saving map..."\\015'
+                ExecStop=/usr/bin/screen -p 0 -S mc-%i -X eval 'stuff "save-all"\\015'
+                ExecStop=/usr/bin/screen -p 0 -S mc-%i -X eval 'stuff "stop"\\015'
+                ExecStop=/bin/sleep 10
 
                 [Install]
                 WantedBy=default.target" >> /etc/systemd/system/minecraft.service
