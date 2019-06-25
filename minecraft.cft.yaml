@@ -103,6 +103,7 @@ Resources:
                 # yum updates and installs
                 yum update -y
                 yum install git -y
+                yum install java-1.8.0-openjdk-devel
 
                 # clone git repo with all scripts
                 mkdir /minecraft
@@ -118,7 +119,7 @@ Resources:
                 User=minecraft
                 Restart=always
                 Type=simple
-                ExecStart=java -Xmx1024M -Xms1024M -jar /minecraft/minecraft_server.1.14.3.jar nogui
+                ExecStart=java -Xmx1024M -Xms1024M -jar /minecraft/server.jar nogui
 
                 [Install]
                 WantedBy=default.target" >> /etc/systemd/system/minecraft.service
@@ -126,6 +127,7 @@ Resources:
                 cd /minecraft
                 git clone https://github.com/cameronstinson4/minecraft-scripts.git
                 chmod +x /minecraft/minecraft-scripts/*.sh
+                echo "eula=true" >> /minecraft/eula.txt
 
                 # download minecraft
                 /minecraft/minecraft-scripts/install-minecraft.sh
